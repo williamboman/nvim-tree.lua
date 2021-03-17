@@ -1,56 +1,46 @@
+local api = vim.api
 local luv = vim.loop
+
 local lib = require'nvim-tree.lib'
 local config = require'nvim-tree.config'
 local colors = require'nvim-tree.colors'
 local renderer = require'nvim-tree.renderer'
 local fs = require'nvim-tree.fs'
 local utils = require'nvim-tree.utils'
-local api = vim.api
+local layout = require'nvim-tree.layout'
 
 local M = {}
 
 function M.toggle()
-  if lib.win_open() then
-    lib.close()
+  if layout.is_win_open() then
+    layout.win_close()
   else
+    layout.win_open()
     if vim.g.nvim_tree_follow == 1 then
       vim.schedule(function() M.find_file(true) end)
-    else
-      vim.schedule(lib.open)
     end
   end
 end
 
 function M.close()
-  if lib.win_open() then
-    lib.close()
-    return true
-  end
+  layout.win_close()
+  return true
 end
 
 function M.open(cb)
   vim.schedule(
     function()
-      if not lib.win_open() then
-        lib.open()
+      if not layout.is_win_open() then
+        layout.win_open()
+        if not lib.loaded then
+          lib.init()
+        end
       else
         lib.set_target_win()
       end
       pcall(cb)
     end
   )
-end
-
-local winopts = config.window_options()
-function M.tab_change()
-  -- we need defer_fn to make sure we close/open after we enter the tab
-  vim.defer_fn(function()
-    if M.close() then
-      M.open(function()
-        api.nvim_command('wincmd '..winopts.open_command)
-      end)
-    end
-  end, 1)
 end
 
 local function gen_go_to(mode)
@@ -150,7 +140,7 @@ function M.find_file(with_open)
   if with_open then
     return M.open(
       function()
-        lib.win_focus()
+        layout.win_focus()
         if not is_file_readable(filepath) then return end
         lib.set_index_and_redraw(filepath)
       end
@@ -197,7 +187,21 @@ function M.reset_highlight()
   renderer.render_hl(lib.Tree.bufnr)
 end
 
-colors.setup()
-vim.defer_fn(M.on_enter, 1)
+function M.setup(opts)
+  layout.setup {
+    keep_size = opts.keep_size or false,
+    keep_open = opts.keep_open or false,
+    side = opts.side or 'left',
+    size = opts.size or 30,
+    disable_keymaps = opts.disable_keymaps or false,
+    keymaps = opts.keymaps or {}
+  }
+  layout.buf_create()
+  colors.setup()
+  if opts.open_on_setup then
+    layout.win_open()
+    lib.init()
+  end
+end
 
 return M

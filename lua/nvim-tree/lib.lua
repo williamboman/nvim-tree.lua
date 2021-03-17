@@ -6,6 +6,7 @@ local config = require'nvim-tree.config'
 local git = require'nvim-tree.git'
 local pops = require'nvim-tree.populate'
 local utils = require'nvim-tree.utils'
+local layout = require'nvim-tree.layout'
 local populate = pops.populate
 local refresh_entries = pops.refresh_entries
 
@@ -15,50 +16,17 @@ local M = {}
 
 M.Tree = {
   entries = {},
-  buf_name = 'NvimTree',
   cwd = nil,
-  win_width =  vim.g.nvim_tree_width or 30,
-  win_width_allow_resize = vim.g.nvim_tree_width_allow_resize,
-  loaded = false,
-  bufnr = nil,
   target_winid = nil,
-  winnr = function()
-    for _, i in ipairs(api.nvim_list_wins()) do
-      if api.nvim_buf_get_name(api.nvim_win_get_buf(i)):match('.*'..utils.path_separator..M.Tree.buf_name..'$') then
-        return i
-      end
-    end
-  end,
-  options = {
-    'noswapfile',
-    'norelativenumber',
-    'nonumber',
-    'nolist',
-    'winfixwidth',
-    'winfixheight',
-    'nofoldenable',
-    'nospell',
-    'signcolumn=yes',
-    'foldmethod=manual',
-    'foldcolumn=0'
-  }
+  loaded = false,
 }
 
-function M.init(with_open, with_render)
+function M.init()
+  M.set_target_win()
   M.Tree.cwd = luv.cwd()
   populate(M.Tree.entries, M.Tree.cwd, M.Tree)
-
-  local stat = luv.fs_stat(M.Tree.cwd)
-  M.Tree.last_modified = stat.mtime.sec
-
-  if with_open then
-    M.open()
-  end
-
-  if with_render then
-    renderer.draw(M.Tree, true)
-    M.Tree.loaded = true
-  end
+  renderer.draw(M.Tree, true)
+  M.loaded = true
 end
 
 local function get_node_at_line(line)
@@ -79,7 +47,7 @@ local function get_node_at_line(line)
 end
 
 function M.get_node_at_cursor()
-  local cursor = api.nvim_win_get_cursor(M.Tree.winnr())
+  local cursor = api.nvim_win_get_cursor(layout.get_win())
   local line = cursor[1]
   if line == 1 and M.Tree.cwd ~= "/" then
     return { name = ".." }
@@ -132,7 +100,7 @@ function M.refresh_tree()
         git.reload_roots()
         refresh_git(M.Tree)
       end
-      if M.win_open() then
+      if layout.is_win_open() then
         renderer.draw(M.Tree, true)
       else
         M.Tree.loaded = false
@@ -175,7 +143,7 @@ function M.set_index_and_redraw(fname)
   end
 
   local index = iter(M.Tree.entries)
-  if not M.win_open() then
+  if not layout.is_win_open() then
     M.Tree.loaded = false
     return
   end
@@ -263,22 +231,6 @@ local function set_mappings()
   end
 end
 
-local function create_buf()
-  local options = {
-    bufhidden = 'wipe';
-    buftype = 'nofile';
-    modifiable = false;
-  }
-
-  M.Tree.bufnr = api.nvim_create_buf(false, true)
-  api.nvim_buf_set_name(M.Tree.bufnr, M.Tree.buf_name)
-
-  for opt, val in pairs(options) do
-    api.nvim_buf_set_option(M.Tree.bufnr, opt, val)
-  end
-  set_mappings()
-end
-
 local function create_win()
   api.nvim_command("vsplit")
   api.nvim_command("wincmd "..window_opts.side)
@@ -295,26 +247,6 @@ end
 
 function M.set_target_win()
   M.Tree.target_winid = vim.fn.win_getid(vim.fn.bufwinnr(api.nvim_get_current_buf()))
-end
-
-function M.open()
-  M.set_target_win()
-  create_buf()
-  create_win()
-  api.nvim_win_set_buf(M.Tree.winnr(), M.Tree.bufnr)
-
-  for _, opt in pairs(M.Tree.options) do
-    api.nvim_command('setlocal '..opt)
-  end
-
-  if M.Tree.loaded then
-    M.change_dir(vim.fn.getcwd())
-  end
-  renderer.draw(M.Tree, not M.Tree.loaded)
-  M.Tree.loaded = true
-
-  api.nvim_buf_set_option(M.Tree.bufnr, 'filetype', M.Tree.buf_name)
-  api.nvim_command('setlocal '..window_opts.split_command)
 end
 
 function M.close_node(node)
@@ -350,22 +282,6 @@ function M.close_node(node)
     api.nvim_win_set_cursor(M.Tree.winnr(), {index, 0})
   end
   renderer.draw(M.Tree, true)
-end
-
-function M.win_open()
-  return M.Tree.winnr() ~= nil
-end
-
-function M.win_focus(winnr)
-  local wnr = winnr or M.Tree.winnr()
-
-  if vim.api.nvim_win_get_tabpage(wnr) ~= vim.api.nvim_win_get_tabpage(0) then
-    M.close()
-    M.open()
-    wnr = M.Tree.winnr()
-  end
-
-  api.nvim_set_current_win(wnr)
 end
 
 function M.toggle_ignored()

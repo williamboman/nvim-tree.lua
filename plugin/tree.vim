@@ -12,16 +12,15 @@ augroup NvimTree
   if get(g:, 'nvim_tree_hijack_netrw', 1) == 1 && get(g:, 'nvim_tree_disable_netrw', 1) == 0
     autocmd! FileExplorer *
   endif
-  au BufWritePost * lua require'nvim-tree'.refresh()
-  au BufEnter * lua require'nvim-tree'.buf_enter()
-  if get(g:, 'nvim_tree_auto_close') == 1
-    au WinClosed * lua require'nvim-tree'.on_leave()
-  endif
-  au ColorScheme * lua require'nvim-tree'.reset_highlight()
-  au User FugitiveChanged lua require'nvim-tree'.refresh()
-  if get(g:, 'nvim_tree_tab_open') == 1
-    au TabEnter * lua require'nvim-tree'.tab_change()
-  endif
+
+  " au BufWritePost * lua require'nvim-tree'.refresh()
+  " au BufEnter * lua require'nvim-tree'.buf_enter()
+  " au ColorScheme * lua require'nvim-tree'.reset_highlight()
+  " au User FugitiveChanged lua require'nvim-tree'.refresh()
+
+  " au WinClosed * lua require'nvim-tree'.on_leave()
+  au TabEnter * lua require'nvim-tree.layout'.on_tab_change()
+  au BufEnter * lua require'nvim-tree.layout'.on_resize()
 augroup end
 
 command! NvimTreeOpen lua require'nvim-tree'.open()
